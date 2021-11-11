@@ -93,8 +93,10 @@ class model_api extends Model
         WHERE jss_jobs.id = ?";
 
         $result = $this->doSelect($sql, [$jobId]);
-        $result[0]['isSaved'] = $this->checkJobSaved($jobId, $empId)[0]['isJobSaved'];
+        if (count($result) > 0) {
+         $result[0]['isSaved'] = $this->checkJobSaved($jobId, $empId)[0]['isJobSaved'];
         $result[0]['expire_date'] = $this->dateDiffInDays($result[0]['expire_date'], $now);
+        }
         return $result;
     }
 
@@ -395,6 +397,38 @@ class model_api extends Model
         $sqlSave = "INSERT INTO jss_saved_jobs (fk_job_id,fk_employee_id) VALUES (?,?)";
         $result = $this->doQuery($sqlSave, [$jobId, $empId]);
         return $result;
+    }
+    function registerEmployee($registerInfo)
+    {
+        $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE user_name=? AND email =?";
+        $isUserExist = $this->doSelect($sqlIs, [$registerInfo['username'], $registerInfo['email']]);
+ 
+        if ($isUserExist[0]['isExist'] == 0) {
+            $sql = "INSERT INTO jss_employees (user_name,email,password) VALUES (?,?,?)";
+            $this->doQuery($sql, [$registerInfo['username'], $registerInfo['email'], $registerInfo['password']]);
+            $id = "SELECT id FROM jss_employees WHERE user_name=? AND email =?";
+            $id = $this->doSelect($id, [$registerInfo['username'], $registerInfo['email']]);
+            $sql = "INSERT INTO jss_resume (fk_employee_id) VALUES (?)";
+            $this->doQuery($sql, [$id[0]['id']]);
+        } else {
+            return 'failed';
+        }
+    }
+    function loginEmployee($loginInfo)
+    {
+        $sqlIs = "SELECT id,user_name as username,email,token FROM jss_employees WHERE (user_name=? OR email =?) AND password=?";
+        $isUserExist = $this->doSelect($sqlIs, [$loginInfo['username'], $loginInfo['username'],$loginInfo['password']]);
+        return $isUserExist;
+    }
+    function checkEmailExist($email){
+        $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE email =?";
+        $isUserExist = $this->doSelect($sqlIs, [$email]);
+        return $isUserExist;
+    }
+    function checkUsernameExist($username){
+        $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE user_name =?";
+        $isUserExist = $this->doSelect($sqlIs, [$username]);
+        return $isUserExist;
     }
 
     //===============================

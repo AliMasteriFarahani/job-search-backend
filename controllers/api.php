@@ -1,12 +1,20 @@
 <?php
-
+header("Access-Control-Allow-Origin:*");
+header("Access-Control-Allow-Origin: http://localhost:8080");   
+header("Content-Type: application/json; charset=UTF-8");    
+header("Access-Control-Allow-Methods: POST, DELETE, OPTIONS");    
+header("Access-Control-Max-Age: 3600");    
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With"); 
+header("Accept:application/json, text/plain"); 
+header("Vary: *");
+header("Authorization:*");
+use \Firebase\JWT\JWT;
 class Api extends Controller
 {
 
   function __construct()
   {
-    header('Access-Control-Allow-Origin: *');
-    header('Content-type: application/json');
+
   }
 
   function index()
@@ -14,9 +22,39 @@ class Api extends Controller
     echo 'index API';
     echo '<br>';
 
-    print_r($_REQUEST);
-    print_r($_GET);
-    print_r($_SERVER['REQUEST_METHOD']);
+    // Store the string into variable
+    $password = 'Password';
+    $password2 = 'Password';
+    
+    // Use password_hash() function to
+    // create a password hash
+    $hash_default_salt = password_hash($password,
+                  PASSWORD_DEFAULT);
+    
+     $hash_variable_salt = password_hash($password,
+        PASSWORD_DEFAULT, array('cost' => 9));
+
+        
+     $hash_variable_salt2 = password_hash($password,
+        PASSWORD_DEFAULT, array('cost' => 9));
+
+
+        echo $hash_variable_salt . ' : ----1';
+        echo "<br>";
+        echo $hash_variable_salt2 . ' : ----1';
+        echo "<br>";
+
+
+    // Use password_verify() function to
+    // verify the password matches
+    echo password_verify($password2,
+          $hash_default_salt ) . "<br>";
+  
+    
+
+    // print_r($_REQUEST);
+    // print_r($_GET);
+    // print_r($_SERVER['REQUEST_METHOD']);
   }
 
   //===============================
@@ -74,11 +112,25 @@ class Api extends Controller
   {
     if ($_SERVER['REQUEST_METHOD'] == 'GET') {
       //$isSaved = $this->model->checkJobSaved($id,1);
-      $newq = $this->model->getJobDetails($id, $empId);
-      $newq[0]['needed_skills'] = unserialize($newq[0]['needed_skills']);
-      $newq[0]['numOfJobPosition'] = $this->model->getNumOfCompanyJobPositions($newq[0]['companyId'])[0]['numOfJobPositions'];
 
-      echo json_encode($newq);
+      try {
+        $newq = $this->model->getJobDetails($id, $empId);
+        //$newq = $this->model->getJobDetails($id, $empId);
+        if (count($newq)>0) {
+          $newq[0]['needed_skills'] = unserialize($newq[0]['needed_skills']);
+          $newq[0]['numOfJobPosition'] = $this->model->getNumOfCompanyJobPositions($newq[0]['companyId'])[0]['numOfJobPositions'];
+        }elseif(count($newq) == 0){
+          echo json_encode('failed');
+          return;
+        }
+
+      } catch (\Throwable $th) {
+        echo json_encode('failed');
+        return;
+      }
+
+
+      echo json_encode($newq[0]);
     }
   }
   function getNumOfCompanyJobPositions($companyId)
@@ -209,6 +261,144 @@ class Api extends Controller
       echo json_encode($newq);
       // print_r($_REQUEST);
       // print_r($_SERVER['REQUEST_METHOD']);
+    }
+  }
+  function registerEmployee()
+  {
+    //header('X-PHP-Response-Code: 404', true, 404);
+    // header('Access-Control-Allow-Origin:http://localhost:8080/employee/login');
+   // print_r(getallheaders());
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+      $_POST = json_decode(file_get_contents("php://input"), true);
+      $registerInfo = [];
+      isset($_POST['email']) && ($_POST['email'] != '') ? $registerInfo['email'] = $_POST['email'] : '';
+      isset($_POST['username']) && ($_POST['username'] != '') ? $registerInfo['username'] = $_POST['username'] : '';
+      isset($_POST['password']) && ($_POST['password'] != '') ? $registerInfo['password'] = $_POST['password'] : '';
+      isset($_POST['rePassword']) && ($_POST['rePassword'] != '') ? $registerInfo['rePassword'] = $_POST['rePassword'] : '';
+      $msg = '';
+      try {
+        if (count($registerInfo) == 4 && $registerInfo['password'] == $registerInfo['rePassword']) {
+          $registerInfo['password'] = password_hash($registerInfo['password'],PASSWORD_DEFAULT);
+          $this->model->registerEmployee($registerInfo);
+       //   $this->model->registerEmployee($registerInfo);
+          $msg = 'ok';
+        } else {
+          $msg = 'failed';
+        }
+      } catch (\Throwable $th) {
+        $msg = 'failed';
+      }
+      // header('X-PHP-Response-Code: 404', true, 400);
+      echo json_encode($msg);
+      //   $r =  http_response_code(401);
+    }
+  }
+  function loginEmployee()
+  {
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+      // print_r(getallheaders());
+      // print_r('sssss');
+      // return;
+      $_POST = json_decode(file_get_contents("php://input"), true);
+      $loginInfo = [];
+      isset($_POST['username']) && ($_POST['username'] != '') ? $loginInfo['username'] = $_POST['username'] : '';
+      isset($_POST['password']) && ($_POST['password'] != '') ? $loginInfo['password'] = $_POST['password'] : '';
+
+
+    //  $secret_key = "opisdf453+2@8kbmnsd#sldlj454s*5#vljl_dfs_blu78732ljsdfh";
+      $msg = '';
+      if (count($loginInfo)==2) {       
+       // $loginInfo['password'] = password_hash($loginInfo['password'],PASSWORD_DEFAULT);
+        $result = $this->model->loginEmployee($loginInfo);
+        if (count($result) > 0) {
+          $payload = array(
+            // "iss" => "http://example.org",
+            // "iat" => time()
+            // "nbf" => time() + 10,
+            // "exp" => time() + 3600
+            $data = array(
+                'id' => $result[0]['id'],
+                'username'=>$result[0]['username'],
+                'email'=>$result[0]['email'],
+                'expire'=>time()+1*24*3600,
+            )
+        );
+          $jwt = JWT::encode($payload, $this->secretKey);
+          $result[0]['token']=$jwt;
+          $result[0]['expire']=time()+1*24*3600;
+          $msg = ['status'=>true,'userInfo'=>$result[0]];
+        }else{
+          $msg = ['status'=>false,'msg'=>'not found'];
+           http_response_code(401);
+        }
+      }
+      echo json_encode($msg);
+    }
+  }
+
+  function isEmployeeAuthenticated(){
+    if ($_SERVER['REQUEST_METHOD'] == 'GET') {
+   // echo json_encode(['status'=>false]);
+   // return;
+   // $authToken = getallheaders()['Authorization'];
+    // if (!preg_match('/Bearer\s(\S+)/', $authToken, $matches)) {
+    //   header('X-PHP-Response-Code: 401', true, 401);
+    //   echo json_encode(['msg' => 'access denied']);
+    //   exit;
+    // }
+    // print_r('pppppp');
+    // return;
+    $authToken = getallheaders()['Authorization'];
+    if (!preg_match('/Bearer\s(\S+)/', $authToken, $matches)) {
+     // header('X-PHP-Response-Code: 401', true, 401);
+     http_response_code(401);
+      echo json_encode(['msg' => 'access denied']);
+      exit;
+    }
+    $authToken = $matches[1];
+    if ($authToken) {
+      try {
+        $decoded = JWT::decode($authToken, $this->secretKey, array('HS256'));
+       // print_r((array)$decoded[0]);
+        echo json_encode(['status'=>true,'userInfo'=>(array)$decoded[0]]);
+      //  http_response_code(200);
+        ///print_r($decoded);
+      } catch (Exception $e) {
+        // show error message
+        echo json_encode(array(
+          "status" => false,
+        ));
+        http_response_code(401);
+        exit;
+        //die();
+      }
+    } else {
+      header('HTTP/1.0 401 Unauthorized');
+      echo json_encode(array(
+        "status" => false,
+      ));
+
+      die();
+    }
+    }
+  }
+  function signOutUser(){
+    if ($_SERVER['REQUEST_METHOD'] == 'GET') {
+      echo json_encode(['status'=>true]);
+    }
+  }
+  function checkEmailExist($email){
+    if ($_SERVER['REQUEST_METHOD'] == 'GET') {
+      $result = $this->model->checkEmailExist($email);
+      $status = $result[0]['isExist'] == 1 ? true :false; 
+      echo json_encode(['status'=>$status]);
+    }
+  }
+  function checkUsernameExist($email){
+    if ($_SERVER['REQUEST_METHOD'] == 'GET') {
+      $result = $this->model->checkUsernameExist($email);
+      $status = $result[0]['isExist'] == 1 ? true :false; 
+      echo json_encode(['status'=>$status]);
     }
   }
   //===============================

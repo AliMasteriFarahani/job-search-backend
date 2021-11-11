@@ -1,5 +1,5 @@
 <?php
-
+use \Firebase\JWT\JWT;
 class model_employee extends Model
 {
 
@@ -171,6 +171,207 @@ class model_employee extends Model
         return $result;
     }
 
+    function getAllLanguageSkills($empId)
+    {
+        $sql = "SELECT id,title,level
+        FROM jss_resume_language_skills
+        WHERE jss_resume_language_skills.fk_employee_id = ?";
+        $result = $this->doSelect($sql, [$empId]);
+        return $result;
+    }
+
+    function getLanguageSkill($empId, $id)
+    {
+        $sql = "SELECT title,level
+        FROM jss_resume_language_skills
+        WHERE jss_resume_language_skills.fk_employee_id = ? AND jss_resume_language_skills.id=?";
+        $result = $this->doSelect($sql, [$empId, $id]);
+        return $result;
+    }
+    function getEmployeeAvatar($empId)
+    {
+        $sql = "SELECT avatar
+        FROM jss_resume
+        WHERE jss_resume.fk_employee_id = ?";
+        $result = $this->doSelect($sql, [$empId])[0];
+        return $result;
+    }
+    function getEmployeeResumeAttach($empId)
+    {
+        $sql = "SELECT resume_attach_file as resumeAttach
+        FROM jss_resume
+        WHERE jss_resume.fk_employee_id = ?";
+        $result = $this->doSelect($sql, [$empId])[0];
+        return $result;
+    }
+    function getResumeLeftSideInfo($empId)
+    {
+        $sql = "SELECT name,family,job_title as jobTitle
+        FROM jss_resume
+        WHERE jss_resume.fk_employee_id = ?";
+        $result = $this->doSelect($sql, [$empId])[0];
+        return $result;
+    }
+    function isJobApplied($empId, $jobId)
+    {
+        $sqlA = "SELECT COUNT(id) as isJobApplied FROM jss_applied WHERE fk_employee_id=? AND fk_job_id = ? ";
+        $sqlB = "SELECT send_similars as sendSimilars FROM jss_applied WHERE fk_employee_id=? AND fk_job_id = ? ";
+        $resultA = $this->doSelect($sqlA, [$empId, $jobId])[0];
+        $resultB = $this->doSelect($sqlB, [$empId, $jobId]);
+        if ($resultA['isJobApplied'] >= 1) {
+            $resultA['isJobApplied'] = 1;
+        } elseif ($resultA['isJobApplied'] == 0) {
+            $resultA['isJobApplied'] = 0;
+        }
+        if (count($resultB) > 0) {
+            $sendSimilars = $resultB[0]['sendSimilars'];
+        } else {
+            $sendSimilars = 0;
+        }
+        $result['sendSimilars'] = $sendSimilars;
+        $result['isJobApplied'] = $resultA['isJobApplied'];
+        return $result;
+    }
+    function getAppliedJobs($empId, $pageId)
+    {
+        if ($pageId == 1 || $pageId == 0) {
+            $offset = 0;
+        } else {
+            $offset = ($pageId - 1) * 10;
+        }
+        $totalAppliedJob = "SELECT COUNT(jss_applied.id) as totalAppliedJob
+        FROM jss_applied 
+        WHERE  jss_applied.fk_employee_id=?";
+
+
+        $totalAppliedJob = $this->doSelect($totalAppliedJob, [$empId])[0]['totalAppliedJob'];
+        $perPage = 10;
+        $allPages = ceil($totalAppliedJob / $perPage);
+
+        $sql = "SELECT jss_applied.date,status,jss_jobs.title as jobTitle,jss_jobs.id as jobId,jss_provinces.name as province,jss_companies.logo,jss_companies.name as companyName
+         FROM jss_applied 
+         INNER JOIN jss_jobs ON jss_applied.fk_job_id = jss_jobs.id
+         INNER JOIN jss_provinces ON jss_provinces.id = jss_jobs.fk_province_id
+         INNER JOIN jss_companies ON jss_companies.id = jss_jobs.fk_company_id
+         WHERE fk_employee_id=? LIMIT {$offset},10";
+
+        $result = $this->doSelect($sql, [$empId]);
+        $output['result'] = $result;
+        $output['totalAppliedJob'] = $totalAppliedJob;
+        $output['allPages'] = $allPages;
+        $output['pageId'] = $pageId;
+        return $output;
+    }
+
+    //===============================
+    //  POST :                       
+    //===============================
+    function saveEmployeeAvatar($avatar, $employeeId)
+    {
+
+        if ($avatar['size'] > 5242880) {
+            $msg = 'failed';
+            return $msg;
+        }
+        if ($avatar['type'] != 'image/png' && $avatar['type'] != 'image/jpg' && $avatar['type'] != 'image/jpeg') {
+            $msg = 'failed';
+            return $msg;
+        }
+        if ($avatar['error'] != 0) {
+            $msg = 'failed';
+            return $msg;
+        }
+        if ($avatar['name'] != "") {
+            if (!file_exists("public/employee/{$employeeId}/avatar")) {
+                mkdir("public/employee/{$employeeId}/avatar", 0777, true);
+            }
+            $avatarPath = "public/employee/{$employeeId}/avatar/";
+            $files = glob("$avatarPath/*"); // get all file names
+            foreach ($files as $file) { // iterate files
+                if (is_file($file)) {
+                    unlink($file); // delete file
+                }
+            }
+            $path = $avatar['name'];
+            $pathto = $avatarPath . $path;
+            move_uploaded_file($avatar['tmp_name'], $pathto) or die("Could not copy file!");
+            $sql = "UPDATE jss_resume SET avatar=? WHERE fk_employee_id=?";
+            $this->doQuery($sql, [$path, $employeeId]);
+        } else {
+            $msg = 'failed';
+            return $msg;
+        }
+    }
+
+    function saveEmployeeResumeAttach($resumeAttach, $employeeId)
+    {
+
+        if ($resumeAttach['size'] > 5242880) {
+            $msg = 'failed';
+            return $msg;
+        }
+        if ($resumeAttach['type'] != 'application/pdf') {
+            $msg = 'failed';
+            return $msg;
+        }
+        if ($resumeAttach['error'] != 0) {
+            $msg = 'failed';
+            return $msg;
+        }
+        if ($resumeAttach['name'] != "") {
+            if (!file_exists("public/employee/{$employeeId}/resumeAttachment")) {
+                mkdir("public/employee/{$employeeId}/resumeAttachment", 0777, true);
+            }
+            $resumeAttachmentPath = "public/employee/{$employeeId}/resumeAttachment/";
+            $files = glob("$resumeAttachmentPath/*"); // get all file names
+            foreach ($files as $file) { // iterate files
+                if (is_file($file)) {
+                    unlink($file); // delete file
+                }
+            }
+            $path = $resumeAttach['name'];
+            $pathto = $resumeAttachmentPath . $path;
+            move_uploaded_file($resumeAttach['tmp_name'], $pathto) or die("Could not copy file!");
+            $sql = "UPDATE jss_resume SET resume_attach_file=? WHERE fk_employee_id=?";
+            $this->doQuery($sql, [$path, $employeeId]);
+        } else {
+            $msg = 'failed';
+            return $msg;
+        }
+    }
+
+    function applyJobForCompany($employeeId, $jobId, $sendSimilars)
+    {
+        if ($sendSimilars == 'true') {
+            $sendSimilars = 1;
+        } elseif ($sendSimilars == 'false') {
+            $sendSimilars = 0;
+        }
+        $sql = "INSERT INTO jss_applied (fk_employee_id,fk_job_id,send_similars) VALUES (?,?,?)";
+        $this->doQuery($sql, [$employeeId, $jobId, $sendSimilars]);
+    }
+    // function registerEmployee($registerInfo)
+    // {
+    //     $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE user_name=? AND email =?";
+    //     $isUserExist = $this->doSelect($sqlIs, [$registerInfo['username'], $registerInfo['email']]);
+    //     if ($isUserExist[0]['isExist'] == 0) {
+    //         $sql = "INSERT INTO jss_employees (user_name,email,password,token) VALUES (?,?,?)";
+    //         $this->doQuery($sql, [$registerInfo['username'], $registerInfo['email'], $registerInfo['password']]);
+    //         $id = "SELECT id FROM jss_employees WHERE user_name=? AND email =?";
+    //         $id = $this->doSelect($id, [$registerInfo['username'], $registerInfo['email']]);
+    //         $sql = "INSERT INTO jss_resume (fk_employee_id) VALUES (?)";
+    //         $this->doQuery($sql, [$id[0]['id']]);
+    //     } else {
+    //         return 'failed';
+    //     }
+    // }
+    // function loginEmployee($loginInfo)
+    // {
+    //     $sqlIs = "SELECT id,user_name as username,email,token FROM jss_employees WHERE (user_name=? OR email =?) AND password=?";
+    //     $isUserExist = $this->doSelect($sqlIs, [$loginInfo['username'], $loginInfo['username'],$loginInfo['password']]);
+    //     return $isUserExist;
+    // }
+
     //===============================
     //  PATCH :                       
     //===============================
@@ -204,6 +405,11 @@ class model_employee extends Model
         $sql = "UPDATE jss_resume SET skills=? WHERE fk_employee_id=?";
         $this->doQuery($sql, [$skills, $employeeId]);
     }
+    function updateSkills($employeeId)
+    {
+        $sql = "UPDATE jss_resume SET skills=? WHERE fk_employee_id=?";
+        $this->doQuery($sql, [null, $employeeId]);
+    }
     function updateEducation($education, $employeeId, $id)
     {
 
@@ -221,6 +427,17 @@ class model_employee extends Model
         $sql = "UPDATE jss_resume_job_experience SET job_title=?,org_name=?,start_year=?,end_year=?,fk_employee_id=? WHERE id=?";
         $array = [];
         foreach ($jobExperience as  $value) {
+            $array[] = $value;
+        }
+        $array[] = intval($employeeId);
+        $array[] = $id;
+        $this->doQuery($sql, $array);
+    }
+    function updateLanguageSkill($languageSkill, $employeeId, $id)
+    {
+        $sql = "UPDATE jss_resume_language_skills SET title=?,level=?,fk_employee_id=? WHERE id=?";
+        $array = [];
+        foreach ($languageSkill as  $value) {
             $array[] = $value;
         }
         $array[] = intval($employeeId);
@@ -254,6 +471,16 @@ class model_employee extends Model
         $array[] = intval($employeeId);
         $this->doQuery($sql, $array);
     }
+    function saveLanguageSkill($languageSkill, $employeeId)
+    {
+        $sql = "INSERT INTO jss_resume_language_skills (title,level,fk_employee_id) VALUES (?,?,?) ";
+        $array = [];
+        foreach ($languageSkill as  $value) {
+            $array[] = $value;
+        }
+        $array[] = intval($employeeId);
+        $this->doQuery($sql, $array);
+    }
 
 
     //===============================
@@ -268,5 +495,15 @@ class model_employee extends Model
     {
         $sql = "DELETE FROM jss_resume_job_experience WHERE id =?";
         $this->doQuery($sql, [$id]);
+    }
+    function removeLanguageSkill($id)
+    {
+        $sql = "DELETE FROM jss_resume_language_skills WHERE id =?";
+        $this->doQuery($sql, [$id]);
+    }
+    function removeEmployeeAvatar($id)
+    {
+        $sql = "UPDATE jss_resume SET avatar=? WHERE fk_employee_id=?";
+        $this->doQuery($sql, [null, $id]);
     }
 }
