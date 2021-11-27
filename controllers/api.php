@@ -1,13 +1,10 @@
 <?php
-header("Access-Control-Allow-Origin:*");
-header("Access-Control-Allow-Origin: http://localhost:8080");   
-header("Content-Type: application/json; charset=UTF-8");    
-header("Access-Control-Allow-Methods: POST, DELETE, OPTIONS");    
-header("Access-Control-Max-Age: 3600");    
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With"); 
-header("Accept:application/json, text/plain"); 
-header("Vary: *");
-header("Authorization:*");
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\SMTP;
+//require 'PHPMailer/src/Exception.php';
+//require 'PHPMailer/src/PHPMailer.php';
+//require 'PHPMailer/src/SMTP.php';
 use \Firebase\JWT\JWT;
 class Api extends Controller
 {
@@ -21,40 +18,44 @@ class Api extends Controller
   {
     echo 'index API';
     echo '<br>';
-
-    // Store the string into variable
-    $password = 'Password';
-    $password2 = 'Password';
-    
-    // Use password_hash() function to
-    // create a password hash
-    $hash_default_salt = password_hash($password,
-                  PASSWORD_DEFAULT);
-    
-     $hash_variable_salt = password_hash($password,
-        PASSWORD_DEFAULT, array('cost' => 9));
-
-        
-     $hash_variable_salt2 = password_hash($password,
-        PASSWORD_DEFAULT, array('cost' => 9));
-
-
-        echo $hash_variable_salt . ' : ----1';
-        echo "<br>";
-        echo $hash_variable_salt2 . ' : ----1';
-        echo "<br>";
-
-
-    // Use password_verify() function to
-    // verify the password matches
-    echo password_verify($password2,
-          $hash_default_salt ) . "<br>";
-  
-    
-
-    // print_r($_REQUEST);
-    // print_r($_GET);
-    // print_r($_SERVER['REQUEST_METHOD']);
+    //Create an instance; passing `true` enables exceptions
+    $mail = new PHPMailer; 
+ 
+    $mail->isSMTP();                      // Set mailer to use SMTP 
+    $mail->Host = 'smtp.gmail.com';       // Specify main and backup SMTP servers 
+    $mail->SMTPAuth = true;               // Enable SMTP authentication 
+    $mail->Username = 'alimasterifarahani95@gmail.com';   // SMTP username 
+    $mail->Password = 'my_gmail.1000.i_can7';   // SMTP password 
+    $mail->SMTPSecure = 'tls';            // Enable TLS encryption, `ssl` also accepted 
+    $mail->Port = 587;                    // TCP port to connect to 
+     
+    // Sender info 
+    $mail->setFrom('alimasterifarahani95@gmail.com', 'CodexWorld'); 
+    $mail->addReplyTo('alimasterifarahani95@gmail.com', 'CodexWorld'); 
+     
+    // Add a recipient 
+    $mail->addAddress('alimasterifarahani95@gmail.com'); 
+     
+    //$mail->addCC('cc@example.com'); 
+    //$mail->addBCC('bcc@example.com'); 
+     
+    // Set email format to HTML 
+    $mail->isHTML(true); 
+     
+    // Mail subject 
+    $mail->Subject = 'Email from Localhost by CodexWorld'; 
+     
+    // Mail body content 
+    $bodyContent = '<h1>How to Send Email from Localhost using PHP by CodexWorld</h1>'; 
+    $bodyContent .= '<p>This HTML email is sent from the localhost server using PHP by <b>CodexWorld</b></p>'; 
+    $mail->Body    = $bodyContent; 
+     
+    // Send email 
+    if(!$mail->send()) { 
+        echo 'Message could not be sent. Mailer Error: '.$mail->ErrorInfo; 
+    } else { 
+        echo 'Message has been sent.'; 
+    } 
   }
 
   //===============================
@@ -101,6 +102,11 @@ class Api extends Controller
   }
   function getImmediateJobs()
   {
+    // header('Access-Control-Allow-Origin: *');
+    // header('Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS, post, get');
+    // header("Access-Control-Max-Age", "3600");
+    // header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token');
+    // header("Access-Control-Allow-Credentials", "true");
     if ($_SERVER['REQUEST_METHOD'] == 'GET') {
       $newq = $this->model->getImmediateJobs();
       // print_r(unserialize($newq[0]['needed_skills']));
@@ -108,7 +114,7 @@ class Api extends Controller
       echo json_encode($newq);
     }
   }
-  function getJobDetails($id, $empId)
+  function getJobDetails($id, $empId=null)
   {
     if ($_SERVER['REQUEST_METHOD'] == 'GET') {
       //$isSaved = $this->model->checkJobSaved($id,1);
@@ -150,7 +156,7 @@ class Api extends Controller
       echo json_encode($isSaved);
     }
   }
-  function getSimilarPositions($jobId, $empId)
+  function getSimilarPositions($jobId, $empId=null)
   {
     if ($_SERVER['REQUEST_METHOD'] == 'GET') {
       $newq = $this->model->getSimilarPositions($jobId, $empId);
@@ -158,10 +164,10 @@ class Api extends Controller
       echo json_encode($newq);
     }
   }
-  function getCompanyJobPositions($companyId, $empId,$pageId)
+  function getCompanyJobPositions($companyId,$pageId,$empId=null)
   {
     if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-      $newq = $this->model->getCompanyJobPositions($companyId, $empId,$pageId);
+      $newq = $this->model->getCompanyJobPositions($companyId,$pageId,$empId);
       //$newq = $this->model->checkJobSaved($jobId,$empId);
       echo json_encode($newq);
     }
@@ -336,22 +342,62 @@ class Api extends Controller
     }
   }
 
+  function resetPasswordEmailRequest()
+  {
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+      $_POST = json_decode(file_get_contents("php://input"), true);
+      if (!empty($_POST['email'])) {
+        $msg='';
+        try {
+           $token = $this->model->resetPasswordEmailRequest($_POST['email'],$this->resetPassSecretKey);
+           $this->sendResetPasswordEmail('alimasterifarahani95@gmail.com',$token);
+          $msg = 'ok';
+        } catch (\Throwable $th) {
+          $msg = 'failed';
+        }
+      }
+      echo json_encode($msg);
+    }
+  }
+  function resetPassword($token=null,$email=null){
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+      $_POST = json_decode(file_get_contents("php://input"), true);
+      try {
+        $msg="";
+        if (!empty($_POST['password']) && $_POST['password'] == $_POST['rePassword']) {
+        //  print_r($_POST);
+         // print_r($token);
+         //// print_r($email);
+         $emailEx = $this->model->isEmailExistInResetPassword($email);
+         if (count($emailEx) > 0) {
+          $decoded = JWT::decode($token, $this->resetPassSecretKey, array('HS256'));
+  
+          $data = (array)$decoded[0];
+
+          $timePassed = time()-strtotime($data['created_at']);
+          if (floor(($timePassed%3600)/60) > 10) {
+            $msg='passed';
+            echo json_encode($msg);
+            return;
+          }
+          $password = password_hash($_POST['password'],PASSWORD_DEFAULT);
+          $this->model->changeEmployeePassword($email,$password);
+         }
+          $msg = 'ok';
+        }
+      } catch (\Throwable $th) {
+        $msg = 'failed';
+      }
+  
+      echo json_encode($msg);
+    }
+  }
   function isEmployeeAuthenticated(){
     if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-   // echo json_encode(['status'=>false]);
-   // return;
-   // $authToken = getallheaders()['Authorization'];
-    // if (!preg_match('/Bearer\s(\S+)/', $authToken, $matches)) {
-    //   header('X-PHP-Response-Code: 401', true, 401);
-    //   echo json_encode(['msg' => 'access denied']);
-    //   exit;
-    // }
-    // print_r('pppppp');
-    // return;
     $authToken = getallheaders()['Authorization'];
     if (!preg_match('/Bearer\s(\S+)/', $authToken, $matches)) {
      // header('X-PHP-Response-Code: 401', true, 401);
-     http_response_code(401);
+     //http_response_code(401);
       echo json_encode(['msg' => 'access denied']);
       exit;
     }
@@ -368,7 +414,7 @@ class Api extends Controller
         echo json_encode(array(
           "status" => false,
         ));
-        http_response_code(401);
+       // http_response_code(401);
         exit;
         //die();
       }
@@ -411,6 +457,69 @@ class Api extends Controller
       echo json_encode($newq);
     }
   }
+
+
+function sendResetPasswordEmail($to,$token){
+
+  //Create an instance; passing `true` enables exceptions
+  $mail = new PHPMailer; 
+
+  $mail->isSMTP();                      // Set mailer to use SMTP 
+  $mail->Host = 'smtp.gmail.com';       // Specify main and backup SMTP servers 
+  $mail->SMTPAuth = true;               // Enable SMTP authentication 
+  $mail->Username = 'alimasterifarahani95@gmail.com';   // SMTP username 
+  $mail->Password = 'my_gmail.1000.i_can7';   // SMTP password 
+  $mail->SMTPSecure = 'tls';            // Enable TLS encryption, `ssl` also accepted 
+  $mail->Port = 587;                    // TCP port to connect to 
+   
+  // Sender info 
+  $mail->setFrom('alimasterifarahani95@gmail.com', 'CodexWorld'); 
+  $mail->addReplyTo('alimasterifarahani95@gmail.com', 'CodexWorld'); 
+   
+  // Add a recipient 
+  $mail->addAddress($to); 
+   
+  //$mail->addCC('cc@example.com'); 
+  //$mail->addBCC('bcc@example.com'); 
+   
+  // Set email format to HTML 
+  $mail->isHTML(true); 
+   
+  // Mail subject 
+  $mail->Subject = 'Email from Localhost by CodexWorld'; 
+   
+  // Mail body content 
+  $link = "http://localhost:8080/reset-password?token={$token}&email={$to}";
+  $bodyContent = '<h1>jobout.ir</h1>'; 
+  $bodyContent .= "<p>this is your reset password link</p><br>"; 
+  $bodyContent .= '<a href="'.$link.'">reset password</a>'; 
+  $mail->Body    = $bodyContent; 
+   
+  // Send email 
+  if(!$mail->send()) { 
+      echo 'Message could not be sent. Mailer Error: '.$mail->ErrorInfo; 
+  } else { 
+      echo 'Message has been sent.'; 
+  } 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   function ss()

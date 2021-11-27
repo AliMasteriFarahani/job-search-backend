@@ -12,7 +12,7 @@ class Model
         $servername = 'localhost';
         $username = 'root';
         $password = '';
-        $dbname = 'job-search';
+        $dbname = 'jobout_job-search';
         $attr = array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8');
         self::$conn = new PDO('mysql:host=' . $servername . ';dbname=' . $dbname, $username, $password, $attr);
         self::$conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -97,39 +97,39 @@ class Model
     }
 
 
-    public static function jaliliDate($format = 'Y/n/j')
-    {
+    // public static function jaliliDate($format = 'Y/n/j')
+    // {
 
-        $date = jdate($format);
-        return $date;
-    }
+    //     $date = jdate($format);
+    //     return $date;
+    // }
 
-    public static function jaliliToMiladi($jalili, $format = '/')
-    {
+    // public static function jaliliToMiladi($jalili, $format = '/')
+    // {
 
-        $jalili = explode('/', $jalili);
-        $year = $jalili[0];
-        $month = $jalili[1];
-        $day = $jalili[2];
-        $date = jalali_to_gregorian($year, $month, $day);
-        $date = implode($format, $date);
-        $date = new DateTime($date);
-        $date = $date->format('Y/m/d');
+    //     $jalili = explode('/', $jalili);
+    //     $year = $jalili[0];
+    //     $month = $jalili[1];
+    //     $day = $jalili[2];
+    //     $date = jalali_to_gregorian($year, $month, $day);
+    //     $date = implode($format, $date);
+    //     $date = new DateTime($date);
+    //     $date = $date->format('Y/m/d');
 
-        return $date;
-    }
+    //     return $date;
+    // }
 
-    public static function MiladiTojalili($miladi, $format = '/')
-    {
+    // public static function MiladiTojalili($miladi, $format = '/')
+    // {
 
-        $miladi = explode('/', $miladi);
-        $year = $miladi[0];
-        $month = $miladi[1];
-        $day = $miladi[2];
-        $date = gregorian_to_jalali($year, $month, $day);
-        $date = implode($format, $date);
-        return $date;
-    }
+    //     $miladi = explode('/', $miladi);
+    //     $year = $miladi[0];
+    //     $month = $miladi[1];
+    //     $day = $miladi[2];
+    //     $date = gregorian_to_jalali($year, $month, $day);
+    //     $date = implode($format, $date);
+    //     return $date;
+    // }
 
     function dateDiffInDays($date1, $date2) 
 {

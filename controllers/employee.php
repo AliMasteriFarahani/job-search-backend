@@ -1,20 +1,20 @@
 <?php
-header("Access-Control-Allow-Origin:*");
+////header("Access-Control-Allow-Origin:*");
 // header('Access-Control-Allow-Credentials: true');
- header('Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE');
- header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Request-With');
+ ////header('Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE');
+ ////header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Request-With');
 // header('Content-Type: application/json');
 // header('Access-Control-Max-Age: 86400');
 // header("Access-Control-Allow-Headers: *");
 // header("Vary: *");
-header("Authorization:*");
+////header("Authorization:*");
 use \Firebase\JWT\JWT;
 
 class employee extends Controller
 {
   function __construct()
   {
-    header("Authorization:*");
+  //  header("Authorization:*");
     //  header ("Authorization:ali");
     //  header('Access-Control-Allow-Origin: *');
     //  header('Content-type: application/json');
@@ -287,6 +287,7 @@ class employee extends Controller
       echo json_encode($msg);
     }
   }
+
   // function registerEmployee()
   // {
   //   //header('X-PHP-Response-Code: 404', true, 404);
@@ -527,6 +528,24 @@ class employee extends Controller
         // sleep(2);
         echo json_encode($msg);
       }
+    }
+  }
+  function changeEmployeePassword($employeeId){
+    if ($_SERVER['REQUEST_METHOD'] == 'PATCH') {
+      $_POST = json_decode(file_get_contents("php://input"), true);
+      $info['password'] = !empty($_POST['password']) ? $_POST['password']:'';
+      $info['rePassword'] = !empty($_POST['rePassword']) ? $_POST['rePassword']:'';
+      $msg = '';
+      try {
+        if ($info['password'] == $info['rePassword'] && count($info) == 2) {
+          $password = password_hash($info['password'],PASSWORD_DEFAULT);
+          $msg = $this->model->changeEmployeePassword($employeeId,$password);
+          $msg = 'ok';
+        }
+      } catch (\Throwable $th) {
+        $msg = 'failed';
+      }
+      echo json_encode($msg);
     }
   }
 

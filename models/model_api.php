@@ -1,5 +1,5 @@
 <?php
-
+use \Firebase\JWT\JWT;
 class model_api extends Model
 {
 
@@ -94,8 +94,8 @@ class model_api extends Model
 
         $result = $this->doSelect($sql, [$jobId]);
         if (count($result) > 0) {
-         $result[0]['isSaved'] = $this->checkJobSaved($jobId, $empId)[0]['isJobSaved'];
-        $result[0]['expire_date'] = $this->dateDiffInDays($result[0]['expire_date'], $now);
+            $result[0]['isSaved'] = $this->checkJobSaved($jobId, $empId)[0]['isJobSaved'];
+            $result[0]['expire_date'] = $this->dateDiffInDays($result[0]['expire_date'], $now);
         }
         return $result;
     }
@@ -137,7 +137,7 @@ class model_api extends Model
         }
         return $result;
     }
-    function getCompanyJobPositions($companyId, $empId, $pageId)
+    function getCompanyJobPositions($companyId, $pageId, $empId)
     {
         if ($pageId == 1 || $pageId == 0) {
             $offset = 0;
@@ -402,7 +402,7 @@ class model_api extends Model
     {
         $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE user_name=? AND email =?";
         $isUserExist = $this->doSelect($sqlIs, [$registerInfo['username'], $registerInfo['email']]);
- 
+
         if ($isUserExist[0]['isExist'] == 0) {
             $sql = "INSERT INTO jss_employees (user_name,email,password) VALUES (?,?,?)";
             $this->doQuery($sql, [$registerInfo['username'], $registerInfo['email'], $registerInfo['password']]);
@@ -416,19 +416,65 @@ class model_api extends Model
     }
     function loginEmployee($loginInfo)
     {
-        $sqlIs = "SELECT id,user_name as username,email,token FROM jss_employees WHERE (user_name=? OR email =?) AND password=?";
-        $isUserExist = $this->doSelect($sqlIs, [$loginInfo['username'], $loginInfo['username'],$loginInfo['password']]);
-        return $isUserExist;
+        $sql = "SELECT id,password FROM jss_employees WHERE (user_name=? OR email =?)";
+        $isUserExist = $this->doSelect($sql, [$loginInfo['username'], $loginInfo['username']]);
+        if (count($isUserExist) == 0) {
+            return [];
+        } else {
+            $pass = $isUserExist[0]['password'];
+        }
+
+        // $loginInfo['password'] = 'kjhhdshhs';
+        if (password_verify($loginInfo['password'], $pass) == 1) {
+            $sqlIs = "SELECT id,user_name as username,email,token FROM jss_employees WHERE (user_name=? OR email =?)";
+            $isUserExist = $this->doSelect($sqlIs, [$loginInfo['username'], $loginInfo['username']]);
+            return $isUserExist;
+        } else {
+            return [];
+        }
     }
-    function checkEmailExist($email){
+    function checkEmailExist($email)
+    {
         $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE email =?";
         $isUserExist = $this->doSelect($sqlIs, [$email]);
         return $isUserExist;
     }
-    function checkUsernameExist($username){
+    function checkUsernameExist($username)
+    {
         $sqlIs = "SELECT COUNT(id) as isExist FROM jss_employees WHERE user_name =?";
         $isUserExist = $this->doSelect($sqlIs, [$username]);
         return $isUserExist;
+    }
+    function resetPasswordEmailRequest($email,$resetPassSecretKey)
+    {
+        $isExEmailSql = 'SELECT email from jss_employees WHERE email=?';
+        $isExEmail = $this->doSelect($isExEmailSql, [$email]);
+
+        if (!empty($isExEmail)) {
+            $delSql = 'DELETE FROM jss_reset_password WHERE email=?';
+            $this->doQuery($delSql, [$email]);
+            $payload = array(
+                // "iss" => "http://example.org",
+                // "iat" => time()
+                // "nbf" => time() + 10,
+                // "exp" => time() + 3600
+                $data = array(
+                    'email'=>$isExEmail['0']['email'],
+                    'created_at'=>date("Y-m-d H:i",time())
+                )
+            );
+            // print_r('ooo');
+            // return;
+              $jwt = JWT::encode($payload,$resetPassSecretKey);
+            $sql = "INSERT INTO jss_reset_password (email,token) VALUES (?,?)";
+             $this->doQuery($sql, [$email, $jwt]);
+             return $jwt;
+        }
+    }
+    function isEmailExistInResetPassword($email){
+        $isExEmailSql = 'SELECT email from jss_employees WHERE email=?';
+        $isExEmail = $this->doSelect($isExEmailSql, [$email]);
+        return $isExEmail;
     }
 
     //===============================
@@ -445,7 +491,10 @@ class model_api extends Model
     //  UPDATE :
     //===============================
 
-
+    function changeEmployeePassword($email,$password){
+        $sql = "UPDATE jss_employees SET password=? WHERE email=? ";
+        $this->doQuery($sql, [$password,$email]);
+    }
 
 
 
@@ -554,16 +603,16 @@ class model_api extends Model
         LEFT JOIN jss_salary ON jss_jobs.fk_salary_id = jss_salary.id 
         WHERE jss_jobs.id = jss_saved_jobs.fk_job_id
         LIMIT {$offset},10";
-            //     $sql =
-            //     "SELECT jss_jobs.id as jobId,jss_jobs.title as jobTitle,created_at,jss_companies.name as companyName,logo,jss_companies.id as companyId,jss_provinces.name as provinceName ,jss_salary.fee as salary
-            // FROM jss_jobs  
-            // LEFT JOIN jss_companies ON jss_jobs.fk_company_id = jss_companies.id  
-            // LEFT JOIN jss_provinces ON jss_jobs.fk_province_id = jss_provinces.id 
-            // LEFT JOIN jss_salary ON jss_jobs.fk_salary_id = jss_salary.id
-            // WHERE jss_jobs.fk_company_id = ?
-            // LIMIT {$offset},10";
+        //     $sql =
+        //     "SELECT jss_jobs.id as jobId,jss_jobs.title as jobTitle,created_at,jss_companies.name as companyName,logo,jss_companies.id as companyId,jss_provinces.name as provinceName ,jss_salary.fee as salary
+        // FROM jss_jobs  
+        // LEFT JOIN jss_companies ON jss_jobs.fk_company_id = jss_companies.id  
+        // LEFT JOIN jss_provinces ON jss_jobs.fk_province_id = jss_provinces.id 
+        // LEFT JOIN jss_salary ON jss_jobs.fk_salary_id = jss_salary.id
+        // WHERE jss_jobs.fk_company_id = ?
+        // LIMIT {$offset},10";
 
-         $totalSavedSql = "SELECT COUNT(jss_saved_jobs.id) as totalSaved
+        $totalSavedSql = "SELECT COUNT(jss_saved_jobs.id) as totalSaved
          FROM jss_saved_jobs  
          WHERE  jss_saved_jobs.fk_employee_id=?";
 
@@ -597,7 +646,4 @@ class model_api extends Model
         // ->sql();
 
     }
-
-
-
 }

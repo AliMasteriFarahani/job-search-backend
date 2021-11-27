@@ -445,6 +445,10 @@ class model_employee extends Model
         $this->doQuery($sql, $array);
     }
 
+    function changeEmployeePassword($employeeId,$password){
+        $sql = "UPDATE jss_employees SET password=? WHERE emaid=? ";
+        $this->doQuery($sql, [$password,$employeeId]);
+    }
 
     //===============================
     //  PUT :                       
